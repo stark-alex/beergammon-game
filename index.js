@@ -4,6 +4,67 @@ function IsVictory(points) {
    return false
 }
 
+// start game
+function rollForNumbers(G, ctx) {
+   // Can't have acey-duecy or any socials.
+   let badNumbers = [ 3 ].concat(G.socials);
+
+   if(G.numbers.every(element => element === null)) {
+      // Both players are rolling for number.
+      let p1number = ctx.random.D6() + ctx.random.D6();
+      let p2number = ctx.random.D6() + ctx.random.D6();
+
+      if (p1number === p2number && !G.socials.includes(p1number)) {
+         G.socials.push(p1number);
+         return;
+      } else {
+         if (!badNumbers.includes(p1number)) {
+            G.numbers[0] = p1number;
+         }
+         if (!badNumbers.includes(p2number)) {
+            G.numbers[1] = p2number;
+         }
+      }
+   } else {
+      // One of the players has yet to set a number.
+      if (G.numbers[0] === null) {
+         badNumbers.push(G.numbers[1]);
+      } else {
+         badNumbers.push(G.numbers[0]);
+      }
+
+      let number = 0;
+      do {
+         number = ctx.random.D6() + ctx.random.D6();
+      } while (badNumbers.includes(number))
+
+      if (G.numbers[0] === null) {
+         G.numbers[0] = number;
+      } else {
+         G.numbers[1] = number;
+      }
+   } 
+}
+
+function rollForStart (G, ctx) {
+   // Roll for Start
+   let p1Die = 0;
+   let p2Die = 0;
+
+   do {
+      p1Die = ctx.random.D6();
+      p2Die = ctx.random.D6();
+
+      if (p1Die === p2Die) {
+         G.dice.push(p1Die, p1Die, p1Die, p1Die);
+      }
+   } while (p1Die === p2Die)
+
+   G.dice.push(p1Die, p2Die);
+}
+
+
+// play game
 let BLACK = "b";
 let WHITE = "w";
 let BLACK_ORDER = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12 ];
@@ -152,13 +213,30 @@ function placePiece(G, ctx, lastSection, lastId, section, id) {
 export const Beergammon = {
    name: "beergammon",
 
-   setup: () => ({ points: Array(24).fill(null),
+   setup: () => ({ numbers: Array(2).fill(null),
+                   socials: [ 10 ],
+                   points: Array(24).fill(null),
                    home: [ {"color": "b", "count": 15}, {"color": "w", count: 15}],
                    pokey: Array(2).fill(null),
-                   dice: Array(4).fill(null),
+                   dice: Array(),
                    inHand: null }),
 
-   moves: { clickCell, rollDice },
+   phases: {
+      rollForNumbers: {
+         moves: { rollForNumbers },
+         endIf: G => (G.numbers.every(element => element !== null)),
+         next: 'startGame',
+         start: true,
+      },
+      startGame: {
+         moves: { rollForStart },
+         endIf: G => (G.dice.length !== 0),
+         next: 'play',
+      },
+      play: {
+         moves: { clickCell, rollDice },
+      },
+   },
 
    endIf: (G, ctx) => {
       if (IsVictory(G.points)) {
