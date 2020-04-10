@@ -63,6 +63,13 @@ function rollForStart (G, ctx) {
    G.dice.push(p1Die, p2Die);
 }
 
+function getFirstPlayer(G, ctx) {
+   if (G.dice[G.dice.length - 1] > G.dice[G.dice.length -2 ]){
+      return 1;
+   } else {
+      return 0;
+   }
+}
 
 // play game
 let BLACK = "b";
@@ -235,6 +242,12 @@ export const Beergammon = {
       },
       play: {
          moves: { clickCell, rollDice },
+         turn: {
+            order: {
+              first: (G, ctx) => getFirstPlayer(G, ctx),
+              next: (G, ctx) => (ctx.playOrderPos + 1) % ctx.numPlayers,
+            }
+          }
       },
    },
 
