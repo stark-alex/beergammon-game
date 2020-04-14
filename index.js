@@ -5,6 +5,7 @@ function IsVictory(points) {
 }
 
 // start game
+
 function startRollForNumbers(G, ctx) {
    if(G.numbers.every(element => element === null)) {
       // Both players are rolling for number.
