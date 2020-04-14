@@ -43,7 +43,7 @@ function rollForNumbers(G, ctx) {
       } else {
          G.numbers[1] = number;
       }
-   } 
+   }
 }
 
 function rollForStart (G, ctx) {
@@ -123,11 +123,13 @@ function emptySpot(G, section, id) {
    }
 }
 
-function rollDice(G) {
-      let die1 = 1 + Math.floor(Math.random() * 6);
-      let die2 = 1 + Math.floor(Math.random() * 6);
-      // TODO: handle doubles and acey-deucy
-      G.dice = [die1, die2];
+function startDiceRoll(G, ctx) {
+   return { ...G, rollingDice: ctx.random.D6(2) };
+ }
+
+function finishDiceRoll(G) {
+   // TODO, handle doubles/acey-ducey
+   return { ...G, dice: G.rollingDice, rollingDice: null };
 }
 
 function clickCell(G, ctx, section, id) {
@@ -226,6 +228,7 @@ export const Beergammon = {
                    home: [ {"color": "b", "count": 15}, {"color": "w", count: 15}],
                    pokey: Array(2).fill(null),
                    dice: Array(),
+                   rollingDice: null,
                    inHand: null }),
 
    phases: {
@@ -241,7 +244,7 @@ export const Beergammon = {
          next: 'play',
       },
       play: {
-         moves: { clickCell, rollDice },
+         moves: { clickCell, startDiceRoll, finishDiceRoll },
          turn: {
             order: {
               first: (G, ctx) => getFirstPlayer(G, ctx),
