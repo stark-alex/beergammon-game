@@ -1,18 +1,29 @@
 // Return true if `points` is in a winning configuration.
 function IsVictory(points) {
-   // TODO:
+   // TODO: IsVictory
    return false
 }
 
 // start game
-function rollForNumbers(G, ctx) {
+
+function startRollForNumbers(G, ctx) {
+   if(G.numbers.every(element => element === null)) {
+      // Both players are rolling for number.
+      G.rollingDice = ctx.random.D6(4);
+   } else {
+      // One of the players has yet to set a number.
+      G.rollingDice = ctx.random.D6(2);
+   }
+}
+
+function finishRollForNumbers(G, ctx) {
    // Can't have acey-duecy or any socials.
    let badNumbers = [ 3 ].concat(G.socials);
 
    if(G.numbers.every(element => element === null)) {
       // Both players are rolling for number.
-      let p1number = ctx.random.D6() + ctx.random.D6();
-      let p2number = ctx.random.D6() + ctx.random.D6();
+      let p1number = G.rollingDice[0] + G.rollingDice[1];
+      let p2number = G.rollingDice[2] + G.rollingDice[3];
 
       if (p1number === p2number && !G.socials.includes(p1number)) {
          G.socials.push(p1number);
@@ -33,36 +44,49 @@ function rollForNumbers(G, ctx) {
          badNumbers.push(G.numbers[0]);
       }
 
-      let number = 0;
-      do {
-         number = ctx.random.D6() + ctx.random.D6();
-      } while (badNumbers.includes(number))
+      let number = G.rollingDice[0] + G.rollingDice[1];
 
-      if (G.numbers[0] === null) {
-         G.numbers[0] = number;
-      } else {
-         G.numbers[1] = number;
+      if (!badNumbers.includes(number)) {
+         if (G.numbers[0] === null) {
+            G.numbers[0] = number;
+         } else {
+            G.numbers[1] = number;
+         }
       }
-   } 
+   }
+
+   G.rollingDice = null;
+
+   if (G.numbers.includes(null)) {
+      startRollForNumbers(G, ctx);
+   }
 }
 
-function rollForStart (G, ctx) {
+function startRollForStart (G, ctx) {
    // Roll for Start
-   let p1Die = 0;
-   let p2Die = 0;
-
-   do {
-      p1Die = ctx.random.D6();
-      p2Die = ctx.random.D6();
-
-      if (p1Die === p2Die) {
-         G.dice.push(p1Die, p1Die, p1Die, p1Die);
-      }
-   } while (p1Die === p2Die)
-
-   G.dice.push(p1Die, p2Die);
+   G.rollingDice = ctx.random.D6(2);
 }
 
+function finishRollForStart (G, ctx) {
+   if (G.rollingDice[0] === G.rollingDice[1]) {
+      G.dice.push(G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
+
+      // Roll again.
+      G.rollingDice = null;
+      startRollForStart(G, ctx);
+   } else {
+      G.dice.push(G.rollingDice[0], G.rollingDice[1]);
+      G.rollingDice = null;
+   }
+}
+
+function getFirstPlayer(G, ctx) {
+   if (G.dice[G.dice.length - 1] > G.dice[G.dice.length -2 ]){
+      return 1;
+   } else {
+      return 0;
+   }
+}
 
 // play game
 let BLACK = "b";
@@ -116,11 +140,14 @@ function emptySpot(G, section, id) {
    }
 }
 
-function rollDice(G) {
-      let die1 = 1 + Math.floor(Math.random() * 6);
-      let die2 = 1 + Math.floor(Math.random() * 6);
-      // TODO: handle doubles and acey-deucy
-      G.dice = [die1, die2];
+function startDiceRoll(G, ctx) {
+   G.rollingDice = ctx.random.D6(2);
+}
+
+function finishDiceRoll(G) {
+   // TODO: handle doubles/acey-ducey
+   G.dice = G.rollingDice;
+   G.rollingDice = null;
 }
 
 function clickCell(G, ctx, section, id) {
@@ -196,7 +223,7 @@ function placePiece(G, ctx, lastSection, lastId, section, id) {
             setSpotValue(G, "pokey", ctx.currentPlayer, opponentColor(ctx.currentPlayer), "1");
             setSpotValue(G, section, id, playerColor(ctx.currentPlayer), 1);
          }
-         // Remove used die (TODO: why is this taking both out for doubles?).
+         // Remove used die.
          G.dice.splice(G.dice.indexOf(element.die), 1);
          // Clear hand.
          G.inHand = null;
@@ -219,22 +246,29 @@ export const Beergammon = {
                    home: [ {"color": "b", "count": 15}, {"color": "w", count: 15}],
                    pokey: Array(2).fill(null),
                    dice: Array(),
+                   rollingDice: null,
                    inHand: null }),
 
    phases: {
       rollForNumbers: {
-         moves: { rollForNumbers },
+         moves: { startRollForNumbers, finishRollForNumbers },
          endIf: G => (G.numbers.every(element => element !== null)),
          next: 'startGame',
          start: true,
       },
       startGame: {
-         moves: { rollForStart },
+         moves: { startRollForStart, finishRollForStart },
          endIf: G => (G.dice.length !== 0),
          next: 'play',
       },
       play: {
-         moves: { clickCell, rollDice },
+         moves: { clickCell, startDiceRoll, finishDiceRoll },
+         turn: {
+            order: {
+              first: (G, ctx) => getFirstPlayer(G, ctx),
+              next: (G, ctx) => (ctx.playOrderPos + 1) % ctx.numPlayers,
+            }
+          }
       },
    },
 
