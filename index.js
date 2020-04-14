@@ -27,6 +27,11 @@ function finishRollForNumbers(G, ctx) {
 
       if (p1number === p2number && !G.socials.includes(p1number)) {
          G.socials.push(p1number);
+         G.rollingDice = null;
+
+         if (G.numbers.includes(null)) {
+            startRollForNumbers(G, ctx);
+         }
          return;
       } else {
          if (!badNumbers.includes(p1number)) {
@@ -81,7 +86,7 @@ function finishRollForStart (G, ctx) {
 }
 
 function getFirstPlayer(G, ctx) {
-   if (G.dice[G.dice.length - 1] > G.dice[G.dice.length -2 ]){
+   if (G.dice[G.dice.length - 1] > G.dice[G.dice.length - 2]){
       return 1;
    } else {
       return 0;
@@ -258,7 +263,7 @@ export const Beergammon = {
       },
       startGame: {
          moves: { startRollForStart, finishRollForStart },
-         endIf: G => (G.dice.length !== 0),
+         endIf: G => (G.dice.length !== 0 && G.dice[G.dice.length - 1] !== G.dice[G.dice.length - 2]),
          next: 'play',
       },
       play: {
