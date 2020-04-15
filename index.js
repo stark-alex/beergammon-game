@@ -17,7 +17,7 @@ function startRollForNumbers(G, ctx) {
 }
 
 function finishRollForNumbers(G, ctx) {
-   // Can't have acey-duecy or any socials.
+   // Can't have acey-deuecy or any socials.
    let badNumbers = [ 3 ].concat(G.socials);
 
    if(G.numbers.every(element => element === null)) {
@@ -154,12 +154,12 @@ function startDiceRoll(G, ctx) {
 }
 
 function finishDiceRoll(G) {
-   // TODO: handle acey-ducey
-
    if (G.rollingDice[0] === G.rollingDice[1]) {
       G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
+      G.hadDoubles = true;
    } else if (G.rollingDice[0] + G.rollingDice[1] === 3) {
       G.dice.push(12);
+      G.hadDoubles = true;
    } else {
       G.dice = G.rollingDice;
    }
@@ -175,9 +175,9 @@ function clickCell(G, ctx, section, id) {
    }
 }
 
-function resolveAceyDuecy(G, number) {
-   // Get rid of the acey-ducey indicator.
-   G.dice.splice(G.dice.indexOf(element.die), 12);
+function resolveAceyDeucey(G, ctx, number) {
+   // Get rid of the acey-deucey indicator.
+   G.dice.splice(G.dice.indexOf(12), 1);
    G.dice.push (number, number, number, number);
 }
 
@@ -252,7 +252,11 @@ function placePiece(G, ctx, lastSection, lastId, section, id) {
          G.inHand = null;
          // End turn if done.
          if (G.dice.every(element => element === null)) {
-            ctx.events.endTurn();
+            if (G.hadDoubles) { 
+               G.hadDoubles = false; 
+            } else {
+               ctx.events.endTurn();
+            }
          }
          return true;
       }
@@ -269,6 +273,7 @@ export const Beergammon = {
                    home: [ {"color": "b", "count": 15}, {"color": "w", count: 15}],
                    pokey: Array(2).fill(null),
                    dice: Array(),
+                   hadDoubles: false,
                    rollingDice: null,
                    inHand: null }),
 
@@ -285,7 +290,7 @@ export const Beergammon = {
          next: 'play',
       },
       play: {
-         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDuecy },
+         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey },
          turn: {
             order: {
               first: (G, ctx) => getFirstPlayer(G, ctx),
