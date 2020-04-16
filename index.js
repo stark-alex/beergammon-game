@@ -17,7 +17,7 @@ function startRollForNumbers(G, ctx) {
 }
 
 function finishRollForNumbers(G, ctx) {
-   // Can't have acey-duecy or any socials.
+   // Can't have acey-deuecy or any socials.
    let badNumbers = [ 3 ].concat(G.socials);
 
    if(G.numbers.every(element => element === null)) {
@@ -27,6 +27,11 @@ function finishRollForNumbers(G, ctx) {
 
       if (p1number === p2number && !G.socials.includes(p1number)) {
          G.socials.push(p1number);
+         G.rollingDice = null;
+
+         if (G.numbers.includes(null)) {
+            startRollForNumbers(G, ctx);
+         }
          return;
       } else {
          if (!badNumbers.includes(p1number)) {
@@ -75,13 +80,17 @@ function finishRollForStart (G, ctx) {
       G.rollingDice = null;
       startRollForStart(G, ctx);
    } else {
-      G.dice.push(G.rollingDice[0], G.rollingDice[1]);
+      if (G.rollingDice[0] + G.rollingDice[1] === 3) {
+         G.dice.push(12);
+      } else {
+         G.dice.push(G.rollingDice[0], G.rollingDice[1]);
+      }
       G.rollingDice = null;
    }
 }
 
 function getFirstPlayer(G, ctx) {
-   if (G.dice[G.dice.length - 1] > G.dice[G.dice.length -2 ]){
+   if (G.dice[G.dice.length - 1] > G.dice[G.dice.length - 2]){
       return 1;
    } else {
       return 0;
@@ -145,8 +154,16 @@ function startDiceRoll(G, ctx) {
 }
 
 function finishDiceRoll(G) {
-   // TODO: handle doubles/acey-ducey
-   G.dice = G.rollingDice;
+   if (G.rollingDice[0] === G.rollingDice[1]) {
+      G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
+      G.hadDoubles = true;
+   } else if (G.rollingDice[0] + G.rollingDice[1] === 3) {
+      G.dice.push(12);
+      G.hadDoubles = true;
+   } else {
+      G.dice = G.rollingDice;
+   }
+
    G.rollingDice = null;
 }
 
@@ -156,6 +173,12 @@ function clickCell(G, ctx, section, id) {
    } else {
       placePiece(G, ctx, G.inHand.section, G.inHand.id, section, id);
    }
+}
+
+function resolveAceyDeucey(G, ctx, number) {
+   // Get rid of the acey-deucey indicator.
+   G.dice.splice(G.dice.indexOf(12), 1);
+   G.dice.push (number, number, number, number);
 }
 
 function getPossibleMoves(G, ctx, section, id) {
@@ -229,7 +252,11 @@ function placePiece(G, ctx, lastSection, lastId, section, id) {
          G.inHand = null;
          // End turn if done.
          if (G.dice.every(element => element === null)) {
-            ctx.events.endTurn();
+            if (G.hadDoubles) { 
+               G.hadDoubles = false; 
+            } else {
+               ctx.events.endTurn();
+            }
          }
          return true;
       }
@@ -246,6 +273,7 @@ export const Beergammon = {
                    home: [ {"color": "b", "count": 15}, {"color": "w", count: 15}],
                    pokey: Array(2).fill(null),
                    dice: Array(),
+                   hadDoubles: false,
                    rollingDice: null,
                    inHand: null }),
 
@@ -258,11 +286,11 @@ export const Beergammon = {
       },
       startGame: {
          moves: { startRollForStart, finishRollForStart },
-         endIf: G => (G.dice.length !== 0),
+         endIf: G => (G.dice.length !== 0 && G.dice[G.dice.length - 1] !== G.dice[G.dice.length - 2]),
          next: 'play',
       },
       play: {
-         moves: { clickCell, startDiceRoll, finishDiceRoll },
+         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey },
          turn: {
             order: {
               first: (G, ctx) => getFirstPlayer(G, ctx),
