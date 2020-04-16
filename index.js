@@ -153,18 +153,24 @@ function startDiceRoll(G, ctx) {
    G.rollingDice = ctx.random.D6(2);
 }
 
-function finishDiceRoll(G) {
-   if (G.rollingDice[0] === G.rollingDice[1]) {
-      G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
-      G.hadDoubles = true;
-   } else if (G.rollingDice[0] + G.rollingDice[1] === 3) {
-      G.dice.push(12);
-      G.hadDoubles = true;
-   } else {
-      G.dice = G.rollingDice;
-   }
+function startOverrideDiceRoll(G, ctx) {
+   // Set G.rollingDice to what you want.
+}
 
-   G.rollingDice = null;
+function finishDiceRoll(G) {
+   if (G.rollingDice) {
+      if (G.rollingDice[0] === G.rollingDice[1]) {
+         G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
+         G.hadDoubles = true;
+      } else if (G.rollingDice[0] + G.rollingDice[1] === 3) {
+         G.dice.push(12);
+         G.hadDoubles = true;
+      } else {
+         G.dice = G.rollingDice;
+      }
+
+      G.rollingDice = null;
+   }
 }
 
 function clickCell(G, ctx, section, id) {
@@ -290,7 +296,7 @@ export const Beergammon = {
          next: 'play',
       },
       play: {
-         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey },
+         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey, startOverrideDiceRoll },
          turn: {
             order: {
               first: (G, ctx) => getFirstPlayer(G, ctx),
