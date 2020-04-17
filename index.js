@@ -98,56 +98,10 @@ function getFirstPlayer(G, ctx) {
 }
 
 // play game
-let BLACK = "b";
-let WHITE = "w";
-let BLACK_ORDER = [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12 ];
-let WHITE_ORDER = [ 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0 ];
-let POINT_COUNT = 24;
-
-function playerColor(id) {
-   if (id === "0") return BLACK;
-   return WHITE;
-}
-
-function opponentColor(id) {
-   if (id === "0") return WHITE;
-   return BLACK;
-}
-
-function playerOrder(id) {
-   if (id === "0") return BLACK_ORDER;
-   return WHITE_ORDER;
-}
-
-function getSpotValue(G, section, id) {
-   if (section === "points") {
-      return G.points[id];
-   } else if (section === "home") {
-      return G.home[id];
-   } else if (section === "pokey") {
-      return G.pokey[id];
-   }
-}
-
-function setSpotValue(G, section, id, color, count) {
-   if (section === "points") {
-      G.points[id] = { "color": color, "count": count};
-   } else if (section === "home") {
-      G.home[id] = { "color": color, "count": count};
-   } else if (section === "pokey") {
-      G.pokey[id] = { "color": color, "count": count};
-   }
-}
-
-function emptySpot(G, section, id) {
-   if (section === "points") {
-      G.points[id] = null;
-   } else if (section === "home") {
-      G.home[id] = null;
-   } else if (section === "pokey") {
-      G.pokey[id] = null;
-   }
-}
+let PLAYER_ORDERS = [
+   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 0],
+   [25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 15]
+]
 
 function startDiceRoll(G, ctx) {
    G.rollingDice = ctx.random.D6(2);
@@ -173,32 +127,33 @@ function finishDiceRoll(G) {
    }
 }
 
-function clickCell(G, ctx, section, id) {
-   if (!G.inHand) {
-      choosePiece(G, ctx, section, id);
-   } else {
-      placePiece(G, ctx, G.inHand.section, G.inHand.id, section, id);
-   }
-}
-
 function resolveAceyDeucey(G, ctx, number) {
    // Get rid of the acey-deucey indicator.
    G.dice.splice(G.dice.indexOf(12), 1);
    G.dice.push (number, number, number, number);
 }
 
-function getPossibleMoves(G, ctx, section, id) {
-   let order = playerOrder(ctx.currentPlayer);
-   let currentSpot = -1;
-   if (section === "points") {
-      currentSpot = order.indexOf(id);
+function clickCell(G, ctx, id) {
+   if (G.inHand === null) {
+      choosePiece(G, ctx, id);
+   } else {
+      placePiece(G, ctx, G.inHand, id);
    }
+}
+
+function currentPlayerId(ctx) {
+   return Number(ctx.currentPlayer);
+}
+
+function getPossibleMoves(G, ctx, id) {
+   let order = PLAYER_ORDERS[currentPlayerId(ctx)];
+   let currentSpot = order.indexOf(id);
 
    // Start by getting moves assuming board is empty.
    let rawMoves = [];
-   G.dice.forEach(function(element) {
-      if (element + currentSpot < POINT_COUNT) {
-         rawMoves.push({"spot":order[element + currentSpot], "die": element});
+   G.dice.forEach(function(die) {
+      if (die + currentSpot < order.length) {
+         rawMoves.push({"spot": order[die + currentSpot], "die": die});
       }
    });
 
@@ -207,50 +162,58 @@ function getPossibleMoves(G, ctx, section, id) {
    // destination is spot with 1 opponent piece
    // TODO: destination is home and all checkers are in last quadrant
    let possibleMoves = [];
-   rawMoves.forEach(function(element) {
-      let spotValue = getSpotValue(G, section, id);
-      if (spotValue === null ||
-          spotValue.color === playerColor(ctx.currentPlayer) ||
-          (spotValue.color === opponentColor(ctx.currentPlayer) && spotValue.count === 1)) {
-             possibleMoves.push(element);
+   rawMoves.forEach(function(move) {
+      if (G.spots[move.spot] === null ||
+          G.spots[move.spot].player === currentPlayerId(ctx) ||
+          (G.spots[move.spot].player !== currentPlayerId(ctx) && G.spots[move.spot].count === 1)) {
+             possibleMoves.push(move);
       }
    });
 
-   return rawMoves;
+   return possibleMoves;
 }
 
-function choosePiece(G, ctx, section, id) {
-   let value = getSpotValue(G,section,id);
+function choosePiece(G, ctx, id) {
    // Check to see if chosen spot has a player's piece and that piece has somewhere to go.
-   if (value && value.color === playerColor(ctx.currentPlayer) && getPossibleMoves(G, ctx, section, id).length) {
+   if (G.spots[id] && G.spots[id].player === currentPlayerId(ctx) && getPossibleMoves(G, ctx, id).length) {
       // Pick up the piece.
-      G.inHand = { section: section, id: id }
+      G.inHand = id;
       // Remove piece from board.
-      let currentValue = getSpotValue(G, section, id);
-      if (currentValue.count-1 > 0) {
-         setSpotValue(G, section, id, currentValue.color, --currentValue.count);
+      if (G.spots[id].count-1 > 0) {
+         G.spots[id] = { "player": G.spots[id].player, "count": --G.spots[id].count};
       } else {
-         emptySpot(G, section, id);
+         G.spots[id] = null;
       }
    }
 }
 
-function placePiece(G, ctx, lastSection, lastId, section, id) {
-   let moves = getPossibleMoves(G, ctx, lastSection, lastId);
+function placePiece(G, ctx, lastId, id) {
    // Look over the possible moves to see if player picked one of those.
-   moves.some(function(element) {
+   getPossibleMoves(G, ctx, lastId).some(function(element) {
       if (element.spot === id) {
-         // Update new spot.
-         let currentSpot  = getSpotValue(G, section, id);
-         if (currentSpot === null) {
-            setSpotValue(G, section, id, playerColor(ctx.currentPlayer), 1);
-         } else if (currentSpot.color === playerColor(ctx.currentPlayer)) {
-            setSpotValue(G, setSpotValue, id, currentSpot.color, ++currentSpot.count);
-         } else if (currentSpot.color === opponentColor(ctx.currentPlayer)) {
-            // TODO: handle opponent already on pokey.
-            // TODO: pokeys are backwards from other sections.
-            setSpotValue(G, "pokey", ctx.currentPlayer, opponentColor(ctx.currentPlayer), "1");
-            setSpotValue(G, section, id, playerColor(ctx.currentPlayer), 1);
+         if (G.spots[id] === null) {
+            // Put piece in empty spot.
+            G.spots[id] = { "player": currentPlayerId(ctx), "count": 1 };
+         } else if (G.spots[id].player === currentPlayerId(ctx)) {
+            // Put piece with another piece.
+            G.spots[id] = { "player": G.spots[id].player, "count": ++G.spots[id].count};
+         } else if (G.spots[id].player !== currentPlayerId(ctx) && G.spots[id].count === 1) {
+            // Put opponent on pokey
+            if (currentPlayerId(ctx) === 0) {
+               if (G.spots[27] === null) {
+                  G.spots[27] = { "player": 1, "count": 1}
+               } else {
+                  G.spots[27] = { "player": 1, "count": ++G.spots[27].count };
+               }
+            } else {
+               if (G.spots[26] === null) {
+                  G.spots[26] = { "player": 0, "count": 1}
+               } else {
+                  G.spots[26] = { "player": 0, "count": ++G.spots[26].count };
+               }
+            }
+            // Put piece in opponents old spot.
+            G.spots[id] = { "player": currentPlayerId(ctx), "count": 1 };
          }
          // Remove used die.
          G.dice.splice(G.dice.indexOf(element.die), 1);
@@ -275,9 +238,7 @@ export const Beergammon = {
 
    setup: () => ({ numbers: Array(2).fill(null),
                    socials: [ 10 ],
-                   points: Array(24).fill(null),
-                   home: [ {"color": "b", "count": 15}, {"color": "w", count: 15}],
-                   pokey: Array(2).fill(null),
+                   spots: Array(28).fill(null),
                    dice: Array(),
                    hadDoubles: false,
                    rollingDice: null,
@@ -297,6 +258,10 @@ export const Beergammon = {
       },
       play: {
          moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey, startOverrideDiceRoll },
+         onBegin: (G, ctx) => {
+            G.spots[0] = { "player": 0, "count": 15 };
+            G.spots[25] = { "player": 1, "count": 15};
+          },
          turn: {
             order: {
               first: (G, ctx) => getFirstPlayer(G, ctx),
