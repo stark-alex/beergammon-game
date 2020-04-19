@@ -1,15 +1,21 @@
-let NO_PLAYER = -1
-let EMPTY_SPOT = { "player": NO_PLAYER, "count": 0 };
-let PLAYER_ORDERS = [
-   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 28],
-   [25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 29]
-]
-let LAST_QUADRANTS = [
-   [ 19, 20, 21, 22, 23, 24 ],
-   [ 1, 2, 3, 4, 5, 6 ]
-]
-let POKEYS = [ 26, 27 ];
-let HOMES = [ 28, 29 ];
+import {
+   NO_PLAYER,
+   EMPTY_SPOT,
+   POKEYS,
+   PLAYER_0_HOME,
+   PLAYER_1_HOME,
+   HOMES,
+   PLAYER_0_START,
+   PLAYER_1_START,
+   PLAYER_ORDERS,
+   LAST_QUADRANTS,
+ } from "./constants";
+
+ const PlayerState = {
+   PLAYING: 1,
+   ON_POKEY: 2,
+   MOVING_IN: 3
+};
 
 function IsVictory(G, ctx) {
    return G.spots[HOMES[currentPlayerId(ctx)]].count === 15;
@@ -175,21 +181,8 @@ function currentOpponentId(ctx) {
    }
 }
 
-function onPokey(G, ctx) {
-   if (G.spots[POKEYS[currentPlayerId(ctx)]].count > 0){
-      onPokey[currentPlayerId(ctx)] = true;
-   }
-
-   return onPokey[currentPlayerId(ctx)];
-}
-
 function movingIn(G,ctx) {
-   let lastQuadrantCount = G.spots[HOMES[currentPlayerId(ctx)]].count;
-   LAST_QUADRANTS[currentPlayerId(ctx)].forEach (function(id) {
-      lastQuadrantCount += G.spots[id].count;
-   });
-
-   return lastQuadrantCount === 15 || (lastQuadrantCount === 14 && G.inHand);
+   
 }
 
 function destinationFilter(G, ctx, moves) {
@@ -212,7 +205,20 @@ function getPossibleMoves(G, ctx, id) {
    let orderedSpot = order.indexOf(id);
    let possibleMoves = [];
 
-   if (onPokey(G, ctx)) {
+   if (G.playerState[currentPlayerId(ctx)] === PlayerState.MOVING_IN) {
+      // Put in a dummy move to trick the game in to moving forward until
+      //the player resolves the acey-deucy.
+      if (G.dice.includes(12)) {
+         return [ {"spot": 0, "die": 12}];
+      }
+      
+      // Only possible moves are directly home.
+      G.dice.forEach(function(die) {
+         if (order[die + orderedSpot] === HOMES[currentPlayerId(ctx)]) {
+            possibleMoves.push({"spot": order[die + orderedSpot], "die": die});
+         }
+      });
+   } else if (G.playerState[currentPlayerId(ctx)] === PlayerState.ON_POKEY) {
       // Can't move a non-pokey piece or if you didn't get doubles/acey-deucey.
       if (id !== POKEYS[currentPlayerId(ctx)] || !G.hadDoubles) {
          return [];
@@ -231,20 +237,6 @@ function getPossibleMoves(G, ctx, id) {
       possibleMoves.forEach(function(move){
          destinations.push(move.spot);
       })
-   } else if (movingIn(G, ctx)) {
-      // put in a dummy move to trick the game in to move forward until 
-      //the player resolves the acey-deucy.
-      if (G.dice.includes(12)) {
-         return [ {"spot": 0, "die": 12}];
-      }
-      
-      // Only possible moves are directly home.
-      G.dice.forEach(function(die) {
-         if (order[die + orderedSpot] === HOMES[currentPlayerId(ctx)]) {
-            possibleMoves.push({"spot": order[die + orderedSpot], "die": die});
-         }
-      });
-
    } else {
       // No possible moves if piece is in last quadrant and you're not moving in.
       if (LAST_QUADRANTS[currentPlayerId(ctx)].includes(id)) {
@@ -292,9 +284,9 @@ function choosePiece(G, ctx, id) {
 function placePiece(G, ctx, lastId, id) {
    // Figure out where the user is actually trying to go.
    let destinationId = id;
-   if (movingIn(G, ctx)) {
-      if (id === 0) { destinationId = 28; } 
-      else if (id === 25) { destinationId = 29; }
+   if (G.playerState[currentPlayerId(ctx)] === PlayerState.MOVING_IN) {
+      if (id === PLAYER_0_START) { destinationId = PLAYER_0_HOME; } 
+      else if (id === PLAYER_1_START) { destinationId = PLAYER_1_HOME; }
    }
 
    // Look over the possible moves to see if player picked one of those.
@@ -313,16 +305,28 @@ function placePiece(G, ctx, lastId, id) {
             } else {
                G.spots[POKEYS[currentOpponentId(ctx)]] = { "player": currentOpponentId(ctx), "count": ++G.spots[POKEYS[currentOpponentId(ctx)]].count };
             }
+            G.playerState[currentOpponentId(ctx)] = PlayerState.ON_POKEY;
             // Put piece in opponents old spot.
             G.spots[destinationId] = { "player": currentPlayerId(ctx), "count": 1 };
          }
-         // Remove used die.
+         
+         // Clean up.
          G.dice.splice(G.dice.indexOf(element.die), 1);
-         // Clear hand.
          G.inHand = null;
          
-         // Reset pokey indicator if you place a piece just to be sure (big hammer).
-         onPokey[currentPlayerId(ctx)] = false;
+         // Check for moving in.
+         let lastQuadrantCount = G.spots[HOMES[currentPlayerId(ctx)]].count;
+            LAST_QUADRANTS[currentPlayerId(ctx)].forEach (function(id) {
+            lastQuadrantCount += G.spots[id].count;
+         });
+         if (lastQuadrantCount === 15 || lastQuadrantCount === 14 && G.inHand) {
+            G.playerState[currentPlayerId(ctx)] = PlayerState.MOVING_IN;
+         }
+
+         // Check for of pokey
+         if (G.spots[POKEYS[currentPlayerId(ctx)]].count === 0 && G.playerState[currentPlayerId(ctx)] !== PlayerState.MOVING_IN) {
+            G.playerState[currentPlayerId(ctx)] = PlayerState.PLAYING;
+         }
 
          // End the turn if out of moves.
          checkForMoves(G, ctx);
@@ -332,6 +336,7 @@ function placePiece(G, ctx, lastId, id) {
    });
 }
 
+
 export const Beergammon = {
    name: "beergammon",
 
@@ -340,7 +345,7 @@ export const Beergammon = {
                    spots: Array(30).fill(EMPTY_SPOT),
                    dice: Array(),
                    hadDoubles: false,
-                   onPokey: [ false, false ],
+                   playerState: [ PlayerState.PLAYING, PlayerState.PLAYING ],
                    rollingDice: null,
                    inHand: null }),
 
@@ -359,8 +364,8 @@ export const Beergammon = {
       play: {
          moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey, startOverrideDiceRoll },
          onBegin: (G, ctx) => {
-            G.spots[0] = { "player": 0, "count": 15 };
-            G.spots[25] = { "player": 1, "count": 15};
+            G.spots[PLAYER_0_START] = { "player": 0, "count": 15 };
+            G.spots[PLAYER_1_START] = { "player": 1, "count": 15};
           },
          turn: {
             order: {
