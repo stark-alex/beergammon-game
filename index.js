@@ -123,6 +123,8 @@ function checkForMoves(G, ctx) {
       if (!G.hadDoubles) {
          ctx.events.endTurn();
       }
+      // Reset doubles indicator.
+      G.hadDoubles = false;
    }
 }
 
@@ -318,15 +320,11 @@ function placePiece(G, ctx, lastId, id) {
          G.dice.splice(G.dice.indexOf(element.die), 1);
          // Clear hand.
          G.inHand = null;
-         // End turn if done.
-         if (G.dice.every(element => element === null)) {
-            if (G.hadDoubles) { 
-               G.hadDoubles = false; 
-            } else {
-               ctx.events.endTurn();
-            }
-         }
+         
+         // Reset pokey indicator if you place a piece just to be sure (big hammer).
          onPokey[currentPlayerId(ctx)] = false;
+
+         // End the turn if out of moves.
          checkForMoves(G, ctx);
          return true;
       }
