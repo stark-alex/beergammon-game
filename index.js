@@ -9,6 +9,7 @@ import {
    PLAYER_1_START,
    PLAYER_ORDERS,
    LAST_QUADRANTS,
+   DrinkReason,
  } from "./constants";
 
  const PlayerState = {
@@ -19,6 +20,16 @@ import {
 
 function IsVictory(G, ctx) {
    return G.spots[HOMES[currentPlayerId(ctx)]].count === 15;
+}
+
+function addDrink(G, ctx, player, reason) {
+   if (!G.drinks[ctx.turn]) {
+      G.drinks[ctx.turn] = [
+         [],
+         []
+      ]
+   }
+   G.drinks[ctx.turn][player].push(reason);
 }
 
 // start game
@@ -60,15 +71,16 @@ function finishRollForNumbers(G, ctx) {
       }
    } else {
       // One of the players has yet to set a number.
-      if (G.numbers[0] === null) {
-         badNumbers.push(G.numbers[1]);
-      } else {
-         badNumbers.push(G.numbers[0]);
-      }
-
       let number = G.rollingDice[0] + G.rollingDice[1];
 
-      if (!badNumbers.includes(number)) {
+      // Check to see if single roll matches already set number.
+      if ((G.numbers[0] === null && number === G.numbers[1]) || 
+          (G.numbers[1] === null && number === G.numbers[0])) {
+            G.socials.push(number)
+            G.numbers = Array(2).fill(null);
+      }
+      // Next, ensure new number is allowed.
+      else if (!badNumbers.includes(number)) {
          if (G.numbers[0] === null) {
             G.numbers[0] = number;
          } else {
@@ -125,7 +137,11 @@ function startOverrideDiceRoll(G, ctx) {
 
 function checkForMoves(G, ctx) {
    if (getAllPossibleMoves(G, ctx).length === 0) {
-      G.dice = [];
+      // If there are un-used dice drink and clear out.
+      if (G.dice.length) {
+         addDrink(G, ctx, currentPlayerId(ctx), DrinkReason.CANT_MOVE)
+         G.dice = [];
+      }
       if (!G.hadDoubles) {
          ctx.events.endTurn();
       }
@@ -135,15 +151,33 @@ function checkForMoves(G, ctx) {
 }
 
 function finishDiceRoll(G, ctx) {
+   let total = G.rollingDice.reduce(function(a, b){return a + b;}, 0);
+
    if (G.rollingDice) {
       if (G.rollingDice[0] === G.rollingDice[1]) {
          G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
          G.hadDoubles = true;
-      } else if (G.rollingDice[0] + G.rollingDice[1] === 3) {
+      } else if (total === 3) {
          G.dice.push(12);
          G.hadDoubles = true;
       } else {
          G.dice = G.rollingDice;
+      }
+
+      // Doubles
+      if (G.hadDoubles) {
+         addDrink(G, ctx, currentOpponentId(ctx), DrinkReason.DOUBLES);
+      }
+      // Numbers
+      G.numbers.forEach(function(number, index) {
+         if (total === number) {
+            addDrink(G, ctx, index, DrinkReason.NUMBER);
+         }
+      });
+      // Social!
+      if (G.socials.includes(total)) {
+         addDrink(G, ctx, 0, DrinkReason.SOCIAL);
+         addDrink(G, ctx, 1, DrinkReason.SOCIAL);
       }
 
       G.rollingDice = null;
@@ -179,10 +213,6 @@ function currentOpponentId(ctx) {
    } else {
       return 0;
    }
-}
-
-function movingIn(G,ctx) {
-   
 }
 
 function destinationFilter(G, ctx, moves) {
@@ -347,7 +377,8 @@ export const Beergammon = {
                    hadDoubles: false,
                    playerState: [ PlayerState.PLAYING, PlayerState.PLAYING ],
                    rollingDice: null,
-                   inHand: null }),
+                   inHand: null,
+                   drinks: Array() }),
 
    phases: {
       rollForNumbers: {
