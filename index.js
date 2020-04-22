@@ -12,6 +12,8 @@ import {
    DrinkReason,
  } from "./constants";
 
+ import { v4 as uuidv4 } from 'uuid';
+
  const PlayerState = {
    PLAYING: 1,
    ON_POKEY: 2,
@@ -22,14 +24,16 @@ function IsVictory(G, ctx) {
    return G.spots[HOMES[currentPlayerId(ctx)]].count === 15;
 }
 
-function addDrink(G, ctx, player, reason) {
-   if (!G.drinks[ctx.turn]) {
-      G.drinks[ctx.turn] = [
-         [],
-         []
-      ]
+function addDrink(G, ctx, player, reason, notified=false, count=1 ) {
+   let drink = {
+      id: uuidv4(),
+      turn: ctx.turn,
+      player: player,
+      reason: reason,
+      count: count,
+      notified: notified
    }
-   G.drinks[ctx.turn][player].push(reason);
+   G.drinks.push (drink);
 }
 
 // start game
@@ -139,7 +143,7 @@ function checkForMoves(G, ctx) {
    if (getAllPossibleMoves(G, ctx).length === 0) {
       // If there are un-used dice drink and clear out.
       if (G.dice.length) {
-         addDrink(G, ctx, currentPlayerId(ctx), DrinkReason.CANT_MOVE)
+         addDrink(G, ctx, currentPlayerId(ctx), DrinkReason.CANT_MOVE, false, G.dice.length);
          G.dice = [];
       }
       if (!G.hadDoubles) {
@@ -177,7 +181,8 @@ function finishDiceRoll(G, ctx) {
       // Social!
       if (G.socials.includes(total)) {
          addDrink(G, ctx, 0, DrinkReason.SOCIAL);
-         addDrink(G, ctx, 1, DrinkReason.SOCIAL);
+         // No need to notify both users of a social but do want to track everyone's drinks.
+         addDrink(G, ctx, 1, DrinkReason.SOCIAL, true);
       }
 
       G.rollingDice = null;
@@ -193,6 +198,15 @@ function resolveAceyDeucey(G, ctx, number) {
 
    // Make sure they didn't pick a number that can't move like a real dummy.
    checkForMoves(G, ctx);
+}
+
+function markDrinkNotified(G, ctx, id) {
+   for (let drink of G.drinks) {
+      if (drink.id === id) {
+         drink.notified = true;
+         break;
+      }
+    }
 }
 
 function clickCell(G, ctx, id) {
@@ -393,7 +407,7 @@ export const Beergammon = {
          next: 'play',
       },
       play: {
-         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey, startOverrideDiceRoll },
+         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey, markDrinkNotified, startOverrideDiceRoll },
          onBegin: (G, ctx) => {
             G.spots[PLAYER_0_START] = { "player": 0, "count": 15 };
             G.spots[PLAYER_1_START] = { "player": 1, "count": 15};

@@ -15,5 +15,8 @@
   "bugs": {
     "url": "https://github.com/stark-alex/beergammon-game/issues"
   },
-  "homepage": "https://github.com/stark-alex/beergammon-game#readme"
+  "homepage": "https://github.com/stark-alex/beergammon-game#readme",
+  "dependencies": {
+    "uuid": "^7.0.3"
+  }
 }
