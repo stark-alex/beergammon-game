@@ -24,20 +24,42 @@ function IsVictory(G, ctx) {
    return G.spots[HOMES[currentPlayerId(ctx)]].count === 15;
 }
 
-function addDrink(G, ctx, player, reason, notified=false, count=1 ) {
-   let drink = {
-      id: uuidv4(),
-      turn: ctx.turn,
-      player: player,
-      reason: reason,
-      count: count,
-      notified: notified
+function addDrink(G, ctx, player, reason, count=1 ) {
+   let id = uuidv4();
+   
+   if (player === 2) {
+      // if player 2, that means add a drink for each player but use the same uuid for notifications.
+      let drink0 = {
+         id: id,
+         turn: ctx.turn,
+         player: 0,
+         reason: reason,
+         count: count,
+      }
+      let drink1 = {
+         id: id,
+         turn: ctx.turn,
+         player: 1,
+         reason: reason,
+         count: count,
+      }
+      G.drinks.push (drink0);
+      G.drinks.push (drink1);
+
+   } else {
+      let drink = {
+         id: id,
+         turn: ctx.turn,
+         player: player,
+         reason: reason,
+         count: count,
+      }
+      G.drinks.push (drink);
    }
-   G.drinks.push (drink);
+   
 }
 
 // start game
-
 function startRollForNumbers(G, ctx) {
    if(G.numbers.every(element => element === null)) {
       // Both players are rolling for number.
@@ -143,7 +165,7 @@ function checkForMoves(G, ctx) {
    if (getAllPossibleMoves(G, ctx).length === 0) {
       // If there are un-used dice drink and clear out.
       if (G.dice.length) {
-         addDrink(G, ctx, currentPlayerId(ctx), DrinkReason.CANT_MOVE, false, G.dice.length);
+         addDrink(G, ctx, currentPlayerId(ctx), DrinkReason.CANT_MOVE, G.dice.length);
          G.dice = [];
       }
       if (!G.hadDoubles) {
@@ -180,15 +202,16 @@ function finishDiceRoll(G, ctx) {
       });
       // Social!
       if (G.socials.includes(total)) {
-         addDrink(G, ctx, 0, DrinkReason.SOCIAL);
-         // No need to notify both users of a social but do want to track everyone's drinks.
-         addDrink(G, ctx, 1, DrinkReason.SOCIAL, true);
+         addDrink(G, ctx, 2, DrinkReason.SOCIAL);
       }
 
       G.rollingDice = null;
    }
 
-   checkForMoves(G, ctx);
+   // resolveAceyDeucey will do this once we know what the dice actually are.
+   if(total !== 3) {
+      checkForMoves(G, ctx);
+   }
 }
 
 function resolveAceyDeucey(G, ctx, number) {
@@ -198,15 +221,6 @@ function resolveAceyDeucey(G, ctx, number) {
 
    // Make sure they didn't pick a number that can't move like a real dummy.
    checkForMoves(G, ctx);
-}
-
-function markDrinkNotified(G, ctx, id) {
-   for (let drink of G.drinks) {
-      if (drink.id === id) {
-         drink.notified = true;
-         break;
-      }
-    }
 }
 
 function clickCell(G, ctx, id) {
@@ -250,12 +264,6 @@ function getPossibleMoves(G, ctx, id) {
    let possibleMoves = [];
 
    if (G.playerState[currentPlayerId(ctx)] === PlayerState.MOVING_IN) {
-      // Put in a dummy move to trick the game in to moving forward until
-      //the player resolves the acey-deucy.
-      if (G.dice.includes(12)) {
-         return [ {"spot": 0, "die": 12}];
-      }
-      
       // Only possible moves are directly home.
       G.dice.forEach(function(die) {
          if (order[die + orderedSpot] === HOMES[currentPlayerId(ctx)]) {
@@ -360,14 +368,16 @@ function placePiece(G, ctx, lastId, id) {
          
          // Check for moving in.
          let lastQuadrantCount = G.spots[HOMES[currentPlayerId(ctx)]].count;
-            LAST_QUADRANTS[currentPlayerId(ctx)].forEach (function(id) {
-            lastQuadrantCount += G.spots[id].count;
+         LAST_QUADRANTS[currentPlayerId(ctx)].forEach (function(id) {
+            if (G.spots[id].player === currentPlayerId(ctx)) {
+               lastQuadrantCount += G.spots[id].count;
+            }
          });
-         if (lastQuadrantCount === 15 || lastQuadrantCount === 14 && G.inHand) {
+         if (lastQuadrantCount === 15) {
             G.playerState[currentPlayerId(ctx)] = PlayerState.MOVING_IN;
          }
 
-         // Check for of pokey
+         // Check for moving off pokey
          if (G.spots[POKEYS[currentPlayerId(ctx)]].count === 0 && G.playerState[currentPlayerId(ctx)] !== PlayerState.MOVING_IN) {
             G.playerState[currentPlayerId(ctx)] = PlayerState.PLAYING;
          }
@@ -407,7 +417,7 @@ export const Beergammon = {
          next: 'play',
       },
       play: {
-         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey, markDrinkNotified, startOverrideDiceRoll },
+         moves: { clickCell, startDiceRoll, finishDiceRoll, resolveAceyDeucey, startOverrideDiceRoll },
          onBegin: (G, ctx) => {
             G.spots[PLAYER_0_START] = { "player": 0, "count": 15 };
             G.spots[PLAYER_1_START] = { "player": 1, "count": 15};
