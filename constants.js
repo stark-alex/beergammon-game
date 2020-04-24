@@ -22,3 +22,10 @@ export const LAST_QUADRANTS = [
    [ 19, 20, 21, 22, 23, 24 ],
    [ 1, 2, 3, 4, 5, 6 ]
 ];
+
+export const DrinkReason = {
+   SOCIAL: 1,
+   NUMBER: 2,
+   DOUBLES: 3,
+   CANT_MOVE: 4,
+};
