@@ -24,11 +24,12 @@ function IsVictory(G, ctx) {
    return G.spots[HOMES[currentPlayerId(ctx)]].count === 15;
 }
 
-function addDrink(G, ctx, player, reason, count=1 ) {
+function addDrink(G, ctx, player, reason, count=1) {
    let id = uuidv4();
    
    if (player === 2) {
-      // if player 2, that means add a drink for each player but use the same uuid for notifications.
+      // if player 2, that means add a drink for each player but use the same
+      // uuid for notifications.  i.e. socials.
       let drink0 = {
          id: id,
          turn: ctx.turn,
@@ -56,7 +57,6 @@ function addDrink(G, ctx, player, reason, count=1 ) {
       }
       G.drinks.push (drink);
    }
-   
 }
 
 // start game
