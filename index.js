@@ -154,11 +154,47 @@ function getFirstPlayer(G, ctx) {
 
 // play game
 function startDiceRoll(G, ctx) {
-   G.rollingDice = ctx.random.D6(2);
+   rollDice (G, ctx, ctx.random.D6(2));
 }
 
 function startOverrideDiceRoll(G, ctx) {
-   // Set G.rollingDice to what you want.
+   // call rollDice with what you want.
+}
+
+function rollDice(G, ctx, rollingDice) {
+   G.rollingDice = rollingDice;
+
+   let total = G.rollingDice.reduce(function(a, b){return a + b;}, 0);
+
+   if (G.rollingDice[0] === G.rollingDice[1]) {
+      G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
+      G.hadDoubles = true;
+   } else if (total === 3) {
+      G.dice.push(12);
+      G.hadDoubles = true;
+   } else {
+      G.dice = G.rollingDice;
+   }
+
+   // Doubles
+   if (G.hadDoubles) {
+      addDrink(G, ctx, currentOpponentId(ctx), DrinkReason.DOUBLES);
+   }
+   // Numbers
+   G.numbers.forEach(function(number, index) {
+      if (total === number) {
+         addDrink(G, ctx, index, DrinkReason.NUMBER);
+      }
+   });
+   // Social!
+   if (G.socials.includes(total)) {
+      addDrink(G, ctx, 2, DrinkReason.SOCIAL);
+   }
+
+   // resolveAceyDeucey will do this once we know what the dice actually are.
+   if(total !== 3) {
+      checkForMoves(G, ctx);
+   }
 }
 
 function checkForMoves(G, ctx) {
@@ -177,41 +213,7 @@ function checkForMoves(G, ctx) {
 }
 
 function finishDiceRoll(G, ctx) {
-   let total = G.rollingDice.reduce(function(a, b){return a + b;}, 0);
-
-   if (G.rollingDice) {
-      if (G.rollingDice[0] === G.rollingDice[1]) {
-         G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
-         G.hadDoubles = true;
-      } else if (total === 3) {
-         G.dice.push(12);
-         G.hadDoubles = true;
-      } else {
-         G.dice = G.rollingDice;
-      }
-
-      // Doubles
-      if (G.hadDoubles) {
-         addDrink(G, ctx, currentOpponentId(ctx), DrinkReason.DOUBLES);
-      }
-      // Numbers
-      G.numbers.forEach(function(number, index) {
-         if (total === number) {
-            addDrink(G, ctx, index, DrinkReason.NUMBER);
-         }
-      });
-      // Social!
-      if (G.socials.includes(total)) {
-         addDrink(G, ctx, 2, DrinkReason.SOCIAL);
-      }
-
-      G.rollingDice = null;
-   }
-
-   // resolveAceyDeucey will do this once we know what the dice actually are.
-   if(total !== 3) {
-      checkForMoves(G, ctx);
-   }
+   G.rollingDice = null;
 }
 
 function resolveAceyDeucey(G, ctx, number) {
