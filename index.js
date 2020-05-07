@@ -190,14 +190,12 @@ function rollDice(G, ctx, rollingDice) {
    if (G.socials.includes(total)) {
       addDrink(G, ctx, 2, DrinkReason.SOCIAL);
    }
-
-   // resolveAceyDeucey will do this once we know what the dice actually are.
-   if(total !== 3) {
-      checkForMoves(G, ctx);
-   }
 }
 
 function checkForMoves(G, ctx) {
+   // Skip check if mid-acey-deucey roll.
+   if (G.rollingDice && G.rollingDice.reduce(function(a, b){return a + b;}, 0) === 3) { return; }
+
    if (getAllPossibleMoves(G, ctx).length === 0) {
       // If there are un-used dice drink and clear out.
       if (G.dice.length) {
@@ -214,6 +212,7 @@ function checkForMoves(G, ctx) {
 
 function finishDiceRoll(G, ctx) {
    G.rollingDice = null;
+   checkForMoves(G, ctx);
 }
 
 function resolveAceyDeucey(G, ctx, number) {
