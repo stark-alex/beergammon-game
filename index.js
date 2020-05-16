@@ -12,8 +12,6 @@ import {
    DrinkReason,
  } from "./constants";
 
- import { v4 as uuidv4 } from 'uuid';
-
  const PlayerState = {
    PLAYING: 1,
    ON_POKEY: 2,
@@ -25,7 +23,7 @@ function IsVictory(G, ctx) {
 }
 
 function addDrink(G, ctx, player, reason, count=1) {
-   let id = uuidv4();
+   let id = String(ctx.turn) + String(player) + String(reason) + String(count)
    
    if (player === 2) {
       // if player 2, that means add a drink for each player but use the same
@@ -154,48 +152,14 @@ function getFirstPlayer(G, ctx) {
 
 // play game
 function startDiceRoll(G, ctx) {
-   rollDice (G, ctx, ctx.random.D6(2));
+   G.rollingDice = ctx.random.D6(2);
 }
 
 function startOverrideDiceRoll(G, ctx) {
    // call rollDice with what you want.
 }
 
-function rollDice(G, ctx, rollingDice) {
-   G.rollingDice = rollingDice;
-
-   let total = G.rollingDice.reduce(function(a, b){return a + b;}, 0);
-
-   if (G.rollingDice[0] === G.rollingDice[1]) {
-      G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
-      G.hadDoubles = true;
-   } else if (total === 3) {
-      G.dice.push(12);
-      G.hadDoubles = true;
-   } else {
-      G.dice = G.rollingDice;
-   }
-
-   // Doubles
-   if (G.hadDoubles) {
-      addDrink(G, ctx, currentOpponentId(ctx), DrinkReason.DOUBLES);
-   }
-   // Numbers
-   G.numbers.forEach(function(number, index) {
-      if (total === number) {
-         addDrink(G, ctx, index, DrinkReason.NUMBER);
-      }
-   });
-   // Social!
-   if (G.socials.includes(total)) {
-      addDrink(G, ctx, 2, DrinkReason.SOCIAL);
-   }
-}
-
 function checkForMoves(G, ctx) {
-   // Skip check if mid-acey-deucey roll.
-   if (G.rollingDice && G.rollingDice.reduce(function(a, b){return a + b;}, 0) === 3) { return; }
-
    if (getAllPossibleMoves(G, ctx).length === 0) {
       // If there are un-used dice drink and clear out.
       if (G.dice.length) {
@@ -211,8 +175,41 @@ function checkForMoves(G, ctx) {
 }
 
 function finishDiceRoll(G, ctx) {
-   G.rollingDice = null;
-   checkForMoves(G, ctx);
+   let total = G.rollingDice ? G.rollingDice.reduce(function(a, b){return a + b;}, 0) : 0;
+
+   if (G.rollingDice) {
+      if (G.rollingDice[0] === G.rollingDice[1]) {
+         G.dice.push (G.rollingDice[0], G.rollingDice[0], G.rollingDice[0], G.rollingDice[0]);
+         G.hadDoubles = true;
+      } else if (total === 3) {
+         G.dice.push(12);
+         G.hadDoubles = true;
+      } else {
+         G.dice = G.rollingDice;
+      }
+
+      // Doubles
+      if (G.hadDoubles) {
+         addDrink(G, ctx, currentOpponentId(ctx), DrinkReason.DOUBLES);
+      }
+      // Numbers
+      G.numbers.forEach(function(number, index) {
+         if (total === number) {
+            addDrink(G, ctx, index, DrinkReason.NUMBER);
+         }
+      });
+      // Social!
+      if (G.socials.includes(total)) {
+         addDrink(G, ctx, 2, DrinkReason.SOCIAL);
+      }
+
+      G.rollingDice = null;
+   }
+
+   // resolveAceyDeucey will do this once we know what the dice actually are.
+   if(total !== 3) {
+      checkForMoves(G, ctx);
+   }
 }
 
 function resolveAceyDeucey(G, ctx, number) {
@@ -335,6 +332,19 @@ function choosePiece(G, ctx, id) {
 }
 
 function placePiece(G, ctx, lastId, id) {
+   // Player putting piece back.
+   if (lastId === id) {
+      if (G.spots[id].player === NO_PLAYER) {
+         // Put piece in empty spot.
+         G.spots[id] = { "player": currentPlayerId(ctx), "count": 1 };
+      } else if (G.spots[id].player === currentPlayerId(ctx)) {
+         // Put piece with another piece.
+         G.spots[id] = { "player": G.spots[id].player, "count": ++G.spots[id].count};
+      }
+      G.inHand = null;
+      return true;
+   }
+
    // Figure out where the user is actually trying to go.
    let destinationId = id;
    if (G.playerState[currentPlayerId(ctx)] === PlayerState.MOVING_IN) {
